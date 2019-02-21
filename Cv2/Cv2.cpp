@@ -1,6 +1,7 @@
 #include "pch.h"
 
 int main(int argc, char **argv) {
+	/*
 	int nprocs, myrank;
 	int isend[5], irecv[15];
 	int sendcount, displs[5] = {3, 10, 0, 1, 6};
@@ -31,5 +32,21 @@ int main(int argc, char **argv) {
 		printf("\n");
 	}
 
-	MPI_Finalize();
+	MPI_Finalize();*/
+
+	int istart, iend, nprocs, myrank;
+	int a[9], sum, tmp;
+	MPI_Init(&argc, &argv);
+	MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
+	MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+
+	istart = 3 * myrank + 1;
+	iend = istart + 2;
+	sum = 0;
+	for (int i = istart; i <= iend; i++) {
+		a[i] = i;
+		sum += a[i];
+	}
+
+	printf("suma na p%d: %d\n");
 }
