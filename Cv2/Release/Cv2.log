@@ -1,7 +1,7 @@
 ﻿  Cv2.cpp
   Generating code
-  1 of 4 functions (25.0%) were compiled, the rest were copied from previous compilation.
+  1 of 5 functions (20.0%) were compiled, the rest were copied from previous compilation.
     0 functions were new in current compilation
     0 functions had inline decision re-evaluated but remain unchanged
   Finished generating code
-  Cv2.vcxproj -> C:\Users\student\source\repos\Cv2\Release\Cv2.exe
+  Cv2.vcxproj -> C:\Users\student\source\repos\Cv2\ParallelProgramming1\Release\Cv2.exe

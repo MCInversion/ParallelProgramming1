@@ -10,6 +10,8 @@
 #define PCH_H
 
 #include <cstdio>
+#include <cstdlib>
+#include <ctime>
 #include <mpi.h>
 
 
