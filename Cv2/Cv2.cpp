@@ -20,7 +20,7 @@ int main(int argc, char **argv) {
 	for (int i = 0; i < sendcount; i++) {
 		isend[i] = sendcount;
 	}
-	
+
 	MPI_Gatherv(isend, sendcount, MPI_INT, irecv, recvcounts, displs, MPI_INT, 0, MPI_COMM_WORLD);
 
 	// MPI_Gather(&isend, 1, MPI_INT, irecv, 1, MPI_INT, 0, MPI_COMM_WORLD);
@@ -56,7 +56,7 @@ int main(int argc, char **argv) {
 	int nlocal = N / nprocs;
 	int nlast = N - N % nprocs - 1;
 	// ======================================
-    // ==== RNG =============================
+	// ==== RNG =============================
 	if (myrank == 0) {
 		srand((unsigned)time(NULL));
 
@@ -104,8 +104,15 @@ int main(int argc, char **argv) {
 
 	MPI_Finalize();*/
 
-	const int N = 10;
-	double A[N][N], b[N], c[N];
+	const int N = 100;
+
+	double **A = new double* [N];
+	for (int i = 0; i < N; i++) A[i] = new double [N];
+	double *b = new double [N];
+	double *c = new double [N];
+	double *d = new double [N + 100];
+
+	// double A[N][N], b[N], c[N], d[N + 100];
 
 	int istart, iend, nprocs, myrank;
 	double sum = 0;
@@ -114,8 +121,6 @@ int main(int argc, char **argv) {
 	MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
 	MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
 
-	int nlocal = N / nprocs;
-	int nlast = N - N % nprocs - 1;
 	// ======================================
 	// ==== RNG =============================
 	if (myrank == 0) {
@@ -128,35 +133,73 @@ int main(int argc, char **argv) {
 			b[i] = rand() % 100;
 		}
 
-		// printf("\n ::::: p%d : N = %d, nlocal = %d, nlast = %d ::::\n\n", myrank, N, nlocal, nlast);
+		// serial:
+		for (int i = 0; i < N; i++) {
+			c[i] = 0.;
+			for (int k = 0; k < N; k++) {
+				c[i] += A[i][k] * b[k];
+			}
+		}
 	}
 
-	MPI_Bcast(&A, N * N, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-	MPI_Bcast(b, N, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	int nlocal = N / nprocs + 1;
+	int nlast = N - (nprocs - 1) * nlocal;
 
 	istart = myrank * nlocal;
 	iend = (myrank < nprocs - 1 ? istart + nlocal - 1 : N - 1);
 
-	double *tempv;
+	MPI_Bcast(A, N * N, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	MPI_Bcast(b, N, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
-	tempv = new double [iend - istart];
-	// recvv = new double[iend - istart];
-
-	for (int i = istart; i <= iend; i++) {
-		tempv[i - istart] = 0;
-		for (int k = 0; k < N; k++) {
-			tempv[i - istart] += A[i][k] * b[k];
+	int nbuff = (myrank == nprocs - 1 ? nlast : nlocal);
+	double **AA = new double *[nbuff];
+	for (int i = 0; i < nbuff; i++) {
+		AA[i] = new double[N];
+		for (int j = 0; j < N; j++) {
+			AA[i][j] = A[istart + i][j];
 		}
-		// printf("p%d: c[%d] = %lf\n", myrank, i, tempv[i - istart]);
 	}
 
-	MPI_Gather(tempv, iend - istart, MPI_DOUBLE, c, iend - istart, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	// printf("p%d: block size: %d\n", myrank, nbuff);
+	// printf("p%d: from: %d to: %d\n", myrank, istart, iend);
+
+	double *tempv;
+	tempv = new double [nbuff];
+
+	for (int i = 0; i < nbuff; i++) {
+		tempv[i] = 0.;
+		for (int k = 0; k < N; k++) {
+			tempv[i] += AA[i][k] * b[k];
+		}
+		// printf("p%d: c[%d] = %lf\n", myrank, i + istart, tempv[i]);
+	}
+
+	MPI_Gather(tempv, nlocal, MPI_DOUBLE, d, nlocal, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
 	if (myrank == 0) {
-		for (int i = 0; i < N; i++) {
-			printf("%lf\n", c[i]);
+		int printMax = (N > 21 ? 10 : N);
+		printf("==== End values =============\n");
+		for (int i = 0; i < printMax; i++) {
+			printf("p%d (end): c[%d] = %lf | d[%d] = %lf\n", myrank, i, c[i], i, d[i]);
 		}
+		if (N > 21) {
+			printf(".\n.\n.\n");
+			for (int i = N - 11; i < N; i++) {
+				printf("p%d (end): c[%d] = %lf | d[%d] = %lf\n", myrank, i, c[i], i, d[i]);
+			}
+		}
+		printf("=============================\n");
 	}
+
+	// cleanup
+	for (int i = 0; i < N; i++) delete[] A[i];
+	delete[] A;
+	for (int i = 0; i < nbuff; i++) delete[] AA[i];
+	delete[] AA;
+	delete[] b;
+	delete[] c;
+	delete[] d;
+	delete[] tempv;
 
 	MPI_Finalize();
 }
