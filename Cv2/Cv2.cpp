@@ -103,7 +103,7 @@ int main(int argc, char **argv) {
 	}
 
 	MPI_Finalize();*/
-
+	/*
 	const int N = 100;
 
 	double **A = new double* [N];
@@ -201,5 +201,110 @@ int main(int argc, char **argv) {
 	delete[] d;
 	delete[] tempv;
 
+	MPI_Finalize();*/
+
+	const int n = 100;
+
+	double a[n][n];
+
+	int nprocs, myrank;
+	double b[n], c[n], cTmpPrll[n], cPrll[n];
+	int istart, iend, nlocal = 0, nlast = 0;
+
+	srand((unsigned)time(NULL));
+
+	// skonstruuju sa secke globalne a lokalne premenne MPI
+	MPI_Init(&argc, &argv);
+	// vracia velkost komunikatora (pocet procesov)
+	MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
+	// vracia hodnotu procesu v komunikatore (cislo ktore je pridelene procesu)
+	MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+
+	if (myrank == 0) {
+		// naplnenie pola
+		for (int i = 0; i < n; i++) {
+			for (int j = 0; j < n; j++) {
+				a[i][j] = 20. * rand() / RAND_MAX - 10.;
+			}
+
+			b[i] = 100. * rand() / RAND_MAX;
+		}
+
+		// vypocitanie seriovo
+		for (int i = 0; i < n; i++) {
+			double tmp = 0;
+			for (int j = 0; j < n; j++) {
+				tmp += a[i][j] * b[j];
+			}
+			c[i] = tmp;
+		}
+		
+		int printMax = 5;
+		// vypis
+		for (int i = 0; i < printMax; i++) {
+			printf("%.3lf  ", c[i]);
+		}
+		printf("...  ");
+		for (int i = n - printMax; i < n; i++) {
+			printf("%.3lf  ", c[i]);
+		}
+		printf("\n\n");
+	}
+
+	// rozposlanie poly "threadom"
+	MPI_Bcast(a, n*n, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	MPI_Bcast(b, n, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
+	nlocal = (n / nprocs);// +1;
+	nlast = n - (nprocs - 1) * nlocal;
+
+	// dynamicka alokacia lokalnych poly
+	double **aLokal = new double*[nlocal];
+	for (int i = 0; i < n; i++) {
+		aLokal[i] = new double[n];
+	}
+
+	// start a koniec casti v danom "threade"
+	istart = nlocal * myrank;
+	if (myrank == nprocs - 1)
+	iend = n - 1;
+	else
+	iend = istart + nlocal - 1;
+
+	// naplnenie lokalnej matici
+	for (int i = 0; i < nlocal; i++) {
+		for (int j = 0; j < n; j++) {
+			aLokal[i][j] = a[istart + i][j];
+		}
+	}
+
+	// vypocitanie paralelne
+	for (int i = 0; i < nlocal; i++) {
+		double tmp = 0;
+		for (int j = 0; j < n; j++) {
+			tmp += aLokal[i][j] * b[j];
+		}
+		cTmpPrll[i] = tmp;
+	}
+
+	// spojenie lokalnych vypoctov
+	MPI_Gather(cTmpPrll, nlocal, MPI_DOUBLE, cPrll, nlocal, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
+	if (myrank == 0) {
+		int printMax = 5;
+		// vypis
+		for (int i = 0; i < printMax; i++) {
+			printf("%.3lf  ", cPrll[i]);
+		}
+		printf("...  ");
+		for (int i = n - printMax; i < n; i++) {
+			printf("%.3lf  ", cPrll[i]);
+		}
+		printf("\n");
+	}
+
+	// vycistenie MPI prostredia (to tomto prikaze ziade MPI prikazi byt nemozu)
 	MPI_Finalize();
+
+	return 0;
 }
